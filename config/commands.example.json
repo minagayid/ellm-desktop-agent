@@ -1,0 +1,17 @@
+{
+  "show_python_version": {
+    "argv": ["python", "--version"],
+    "description": "Show the installed Python version",
+    "approval_required": true
+  },
+  "list_local_models": {
+    "argv": ["ollama", "list"],
+    "description": "List models already installed in Ollama",
+    "approval_required": true
+  },
+  "show_gpu": {
+    "argv": ["nvidia-smi", "--query-gpu=name,memory.total,memory.free", "--format=csv,noheader"],
+    "description": "Show NVIDIA GPU name and memory",
+    "approval_required": true
+  }
+}

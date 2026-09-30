@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ellm-desktop-agent"
+version = "0.1.0"
+description = "A local task agent that uses ELLM for workspace-scoped desktop tasks"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "torch>=2.11,<3",
+  "transformers>=5.17,<6",
+  "peft>=0.21,<1",
+  "safetensors>=0.6,<1",
+]
+
+[project.optional-dependencies]
+documents = ["pypdf>=5,<7", "python-docx>=1.1,<2"]
+
+[project.scripts]
+ellm-agent = "ellm_agent.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["ellm_agent*"]

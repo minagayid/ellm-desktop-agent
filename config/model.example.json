@@ -1,0 +1,9 @@
+{
+  "adapter_id": "minagayid/ELLM",
+  "adapter_revision": "3317030574fe5564454573efd8150e4e7178c033",
+  "base_model_id": "HuggingFaceTB/SmolLM2-135M-Instruct",
+  "base_model_revision": "12fd25f77366fa6b3b4b768ec3050bf629380bac",
+  "max_input_tokens": 4096,
+  "max_new_tokens": 256,
+  "temperature": 0.0
+}

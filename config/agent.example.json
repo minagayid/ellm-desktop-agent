@@ -1,0 +1,10 @@
+{
+  "max_steps": 10,
+  "max_file_bytes": 2000000,
+  "max_write_bytes": 16000,
+  "max_observation_chars": 4000,
+  "max_document_pages": 100,
+  "max_docx_expanded_bytes": 20000000,
+  "command_timeout_seconds": 20,
+  "max_command_output_chars": 4000
+}

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "source": "hand-authored synthetic bilingual task-routing prompts; no user files or web data",
+  "splits": {
+    "train": {
+      "rows": 220,
+      "sha256": "77fffef5797b7f9c075b330eb18c3875fe23adb033ea688359b63edf64fa7783",
+      "languages": {
+        "en": 110,
+        "ar": 110
+      }
+    },
+    "dev": {
+      "rows": 88,
+      "sha256": "0c109d7f54a03b4f86cb18cf36a4a130dd34028c54f5bfe80dcd16842221a647",
+      "languages": {
+        "en": 44,
+        "ar": 44
+      }
+    },
+    "test": {
+      "rows": 88,
+      "sha256": "8723a19e7b3adeee84b355664fd52aadd490354338dc42ed184e0ff1225bacb1",
+      "languages": {
+        "en": 44,
+        "ar": 44
+      }
+    }
+  }
+}
