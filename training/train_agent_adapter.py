@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import random
 import tempfile
 import time
@@ -334,6 +335,7 @@ def main() -> None:
         "base_model_revision": BASE_REVISION,
         "starting_adapter_id": ADAPTER_ID,
         "starting_adapter_revision": ADAPTER_REVISION,
+        "training_source_commit": os.environ.get("ELLM_TRAINING_COMMIT"),
         "training_data_manifest_sha256": sha256(manifest_path),
         "training_rows": len(train_data),
         "dev_rows": len(dev_data),
@@ -356,7 +358,7 @@ def main() -> None:
         "selected_dev_loss": best_dev_loss,
         "elapsed_seconds": elapsed,
         "dataset_splits": data_manifest.get("splits", {}),
-        "upload_performed": False,
+        "model_upload_performed": False,
         "status": "candidate_not_promoted",
     }
     CANDIDATE_ROOT.mkdir(parents=True, exist_ok=True)
