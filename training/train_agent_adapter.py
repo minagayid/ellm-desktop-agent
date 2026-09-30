@@ -71,21 +71,35 @@ def collate(batch: list[tuple[list[int], list[int]]], pad_id: int) -> dict[str, 
     return {"input_ids": input_ids, "attention_mask": attention, "labels": labels}
 
 
-def mean_loss(model, data: Dataset, device: torch.device, dtype: torch.dtype) -> float:
+class LossOnly(torch.nn.Module):
+    """Return only the scalar loss so multi-GPU training does not gather full logits."""
+
+    def __init__(self, model: PeftModel, dtype: torch.dtype):
+        super().__init__()
+        self.model = model
+        self.dtype = dtype
+
+    def forward(self, **batch: torch.Tensor) -> torch.Tensor:
+        with torch.autocast("cuda", dtype=self.dtype):
+            mean_token_loss = self.model(**batch).loss.float()
+        valid_tokens = batch["labels"][:, 1:].ne(-100).sum().to(dtype=torch.float32)
+        return torch.stack((mean_token_loss * valid_tokens, valid_tokens))
+
+
+def mean_loss(model: PeftModel, loss_model: torch.nn.Module, data: Dataset, device: torch.device) -> float:
     pad_id = model.config.pad_token_id or model.config.eos_token_id
     loader = DataLoader(data, batch_size=MICRO_BATCH_SIZE, shuffle=False, collate_fn=lambda batch: collate(batch, pad_id))
     model.eval()
     total_loss = 0.0
-    examples = 0
+    token_count = 0
     with torch.inference_mode():
         for batch in loader:
             batch = {key: value.to(device) for key, value in batch.items()}
-            with torch.autocast("cuda", dtype=dtype):
-                loss = model(**batch).loss
-            total_loss += float(loss) * len(batch["input_ids"])
-            examples += len(batch["input_ids"])
+            loss_stats = loss_model(**batch)
+            total_loss += float(loss_stats[..., 0].sum())
+            token_count += int(loss_stats[..., 1].sum())
     model.train()
-    return total_loss / max(examples, 1)
+    return total_loss / max(token_count, 1)
 
 
 def sha256(path: Path) -> str:
@@ -212,6 +226,8 @@ def main() -> None:
     use_bf16 = torch.cuda.is_bf16_supported()
     dtype = torch.bfloat16 if use_bf16 else torch.float16
     scaler = torch.amp.GradScaler("cuda", enabled=not use_bf16)
+    gpu_names = [torch.cuda.get_device_name(index) for index in range(torch.cuda.device_count())]
+    print(json.dumps({"visible_gpus": gpu_names}), flush=True)
     print(f"Loading pinned ELLM adapter {ADAPTER_ID}@{ADAPTER_REVISION}.", flush=True)
     tokenizer = AutoTokenizer.from_pretrained(
         BASE_ID, revision=BASE_REVISION, trust_remote_code=False, use_fast=True
@@ -278,6 +294,10 @@ def main() -> None:
         collate_fn=lambda batch: collate(batch, tokenizer.eos_token_id),
         num_workers=0,
     )
+    loss_model: torch.nn.Module = LossOnly(model, dtype)
+    if torch.cuda.device_count() > 1:
+        loss_model = torch.nn.DataParallel(loss_model, device_ids=list(range(torch.cuda.device_count())))
+        print(f"Using data parallel across {torch.cuda.device_count()} GPUs.", flush=True)
     optimizer = torch.optim.AdamW(trainable, lr=args.learning_rate, weight_decay=0.01)
     started = time.perf_counter()
     train_losses: list[float] = []
@@ -287,13 +307,17 @@ def main() -> None:
     best_trainable_state: dict[str, torch.Tensor] = {}
     model.train()
     for epoch in range(args.epochs):
-        running_loss = 0.0
+        running_loss_sum = 0.0
+        running_token_count = 0
         optimizer.zero_grad(set_to_none=True)
         for index, batch in enumerate(train_loader):
             batch = {key: value.to(device) for key, value in batch.items()}
-            with torch.autocast("cuda", dtype=dtype):
-                loss = model(**batch).loss
-            running_loss += float(loss.detach())
+            loss_stats = loss_model(**batch)
+            loss_sum = loss_stats[..., 0].sum()
+            token_count = loss_stats[..., 1].sum()
+            loss = loss_sum / token_count.clamp_min(1)
+            running_loss_sum += float(loss_sum.detach())
+            running_token_count += int(token_count.detach())
             if scaler.is_enabled():
                 scaler.scale(loss).backward()
                 scaler.unscale_(optimizer)
@@ -306,8 +330,8 @@ def main() -> None:
             else:
                 optimizer.step()
             optimizer.zero_grad(set_to_none=True)
-        train_loss = running_loss / max(len(train_loader), 1)
-        dev_loss = mean_loss(model, dev_data, device, dtype)
+        train_loss = running_loss_sum / max(running_token_count, 1)
+        dev_loss = mean_loss(model, loss_model, dev_data, device)
         train_losses.append(train_loss)
         dev_losses.append(dev_loss)
         if dev_loss < best_dev_loss:
@@ -349,6 +373,7 @@ def main() -> None:
         "max_length": MAX_LENGTH,
         "trainable_parameters": trainable_count,
         "gpu": torch.cuda.get_device_name(0),
+        "gpus_used": gpu_names,
         "torch_version": torch.__version__,
         "transformers_version": transformers.__version__,
         "peft_version": peft.__version__,
