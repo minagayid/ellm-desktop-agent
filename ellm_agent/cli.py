@@ -2,21 +2,50 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
 
 from .limits import bounded_setting
 from .model import LocalELLM, load_model_config
+from .paths import scoped_path
 from .prompts import parse_action, system_prompt
 from .tools import ToolExecutor
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PATH_ARGUMENTS = {
+    "list_directory": ("path",),
+    "read_file": ("path",),
+    "open_path": ("path",),
+    "write_file": ("path",),
+    "replace_file": ("path",),
+    "create_folder": ("path",),
+    "move_path": ("source", "destination"),
+}
 
 
 def _printable(value: str) -> str:
     return "".join(char if char.isprintable() or char in "\n\t" else f"\\u{ord(char):04x}" for char in value)
+
+
+def _plan_signature(plan: dict[str, Any], workspace: Path) -> str:
+    arguments = dict(plan["arguments"])
+    for key in PATH_ARGUMENTS.get(plan["action"], ()):
+        raw_path = arguments[key]
+        try:
+            arguments[key] = os.path.normcase(str(scoped_path(workspace, raw_path)))
+        except (OSError, RuntimeError, ValueError):
+            arguments[key] = os.path.normcase(os.path.normpath(raw_path))
+    if plan["action"] == "find_files":
+        arguments["query"] = arguments["query"].casefold()
+    return json.dumps(
+        {"action": plan["action"], "arguments": arguments},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
 
 
 def _read_json(path: Path, fallback: Path) -> Any:
@@ -109,6 +138,7 @@ def _confirm(
 
 
 def _respond(model: LocalELLM, history: list[dict[str, str]], max_steps: int, executor: ToolExecutor, commands: dict[str, dict[str, Any]]) -> None:
+    declined_plans: set[str] = set()
     for step in range(1, max_steps + 1):
         while len(history) > 6:
             del history[2:4]
@@ -124,6 +154,10 @@ def _respond(model: LocalELLM, history: list[dict[str, str]], max_steps: int, ex
             return
         action = plan["action"]
         arguments = plan["arguments"]
+        plan_key = _plan_signature(plan, executor.workspace)
+        if plan_key in declined_plans:
+            print("Stopped: ELLM repeated an action you declined. Nothing was executed.")
+            return
         history.append({"role": "assistant", "content": json.dumps(plan, ensure_ascii=False)})
 
         if action == "respond":
@@ -151,6 +185,7 @@ def _respond(model: LocalELLM, history: list[dict[str, str]], max_steps: int, ex
                 bounded_setting(executor.agent_config, "max_write_bytes", 16_000, 16_000),
             )
             if not approved:
+                declined_plans.add(plan_key)
                 history.append({"role": "user", "content": "The user declined this action. Do not repeat it; offer another safe option."})
                 continue
         try:

@@ -167,6 +167,9 @@ def main() -> None:
     started = time.perf_counter()
     train_losses: list[float] = []
     dev_losses: list[float] = []
+    best_dev_loss = float("inf")
+    selected_epoch = 0
+    best_trainable_state: dict[str, torch.Tensor] = {}
     model.train()
     for epoch in range(args.epochs):
         running_loss = 0.0
@@ -192,7 +195,22 @@ def main() -> None:
         dev_loss = mean_loss(model, dev_data, device, dtype)
         train_losses.append(train_loss)
         dev_losses.append(dev_loss)
+        if dev_loss < best_dev_loss:
+            best_dev_loss = dev_loss
+            selected_epoch = epoch + 1
+            best_trainable_state = {
+                name: parameter.detach().cpu().clone()
+                for name, parameter in model.named_parameters()
+                if parameter.requires_grad
+            }
         print(json.dumps({"epoch": epoch + 1, "train_loss": train_loss, "dev_loss": dev_loss}), flush=True)
+
+    if not best_trainable_state:
+        raise RuntimeError("training completed without a selectable development checkpoint")
+    with torch.no_grad():
+        for name, parameter in model.named_parameters():
+            if parameter.requires_grad:
+                parameter.copy_(best_trainable_state[name].to(device=parameter.device, dtype=parameter.dtype))
 
     elapsed = time.perf_counter() - started
     data_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -219,6 +237,8 @@ def main() -> None:
         "peft_version": peft.__version__,
         "train_loss_by_epoch": train_losses,
         "dev_loss_by_epoch": dev_losses,
+        "selected_epoch": selected_epoch,
+        "selected_dev_loss": best_dev_loss,
         "elapsed_seconds": elapsed,
         "dataset_splits": data_manifest.get("splits", {}),
         "upload_performed": False,
@@ -230,7 +250,7 @@ def main() -> None:
         model.save_pretrained(staging, safe_serialization=True)
         (staging / "training-run.json").write_text(json.dumps(run, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         staging.rename(candidate)
-    print(json.dumps({"candidate": str(candidate), "train_losses": train_losses, "dev_losses": dev_losses, "elapsed_seconds": elapsed}, indent=2))
+    print(json.dumps({"candidate": str(candidate), "selected_epoch": selected_epoch, "selected_dev_loss": best_dev_loss, "train_losses": train_losses, "dev_losses": dev_losses, "elapsed_seconds": elapsed}, indent=2))
 
 
 if __name__ == "__main__":

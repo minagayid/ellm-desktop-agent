@@ -204,6 +204,8 @@ class ToolExecutor:
             raise ValueError("destination must be a non-empty string")
         source = scoped_path(self.workspace, source_raw)
         destination = scoped_path(self.workspace, destination_raw)
+        if is_sensitive_path(source.relative_to(self.workspace)) or is_sensitive_path(destination.relative_to(self.workspace)):
+            raise PermissionError("moving credential and key material is blocked")
         if source == destination or not source.exists():
             raise ValueError("source must exist and differ from destination")
         if destination.exists():

@@ -10,7 +10,7 @@ The runtime uses your Hugging Face adapter, `minagayid/ELLM`, on its SmolLM2-135
 - Supports listing/searching a selected workspace, reading common text/config formats plus PDF/DOCX, opening files or folders, creating folders and text files, moving paths, replacing a text file with a backup, and summarizing content.
 - Runs only named command entries from `config/commands.local.json`. Each command requires a confirmation. No free-form shell command is exposed to the model.
 - Requires confirmation for creating/replacing files, creating folders, moving paths, and running commands. It never deletes files.
-- Rejects malformed plans, unknown tools, invalid paths, common credential/key paths, or workspace escapes without executing an action. Mutations also require an executor approval flag and visible CLI confirmation.
+- Rejects malformed plans, unknown tools, invalid paths, common credential/key paths, or workspace escapes without executing an action. It blocks moving sensitive paths even if the new name would hide them. Mutations require an executor approval flag and visible CLI confirmation; if a declined plan is repeated, the host stops.
 - Stores no conversation history by default. A selected document and the current task context are sent only to the locally downloaded model.
 
 ## Model limits
@@ -89,7 +89,7 @@ The training pipeline continues the existing LoRA adapter; it does not train a f
 ./.venv/Scripts/python.exe training/evaluate_agent_adapter.py --adapter-dir models/candidates/latest
 ```
 
-Training requires a compatible CUDA PyTorch install and downloads the adapter/base from Hugging Face if they are not cached. Each run creates a separate candidate under `models/candidates/`; it refuses to overwrite one. The evaluation report measures structured-action accuracy, valid JSON rate, exact tool-plan accuracy (including paths, aliases, and requested file text), and unsafe choices on fixed held-out examples. The held-out set has 88 templated synthetic examples, so one answer changes the aggregate by about 1.1 percentage points. A synthetic score is not evidence that the model is safe or reliable in general. Review the report before selecting any candidate with `-Adapter`; the candidate from this run failed its gate and should not be selected.
+Training requires a compatible CUDA PyTorch install and downloads the adapter/base from Hugging Face if they are not cached. Each run creates a separate candidate under `models/candidates/`; it refuses to overwrite one and saves the epoch with the lowest development loss. The evaluation report measures structured-action accuracy, valid JSON rate, exact tool-plan accuracy (including paths, aliases, and requested file text), and unsafe choices on fixed held-out examples. The held-out set has 88 templated synthetic examples, so one answer changes the aggregate by about 1.1 percentage points. A synthetic score is not evidence that the model is safe or reliable in general. Review the report before selecting any candidate with `-Adapter`; the candidate from this run failed its gate and should not be selected.
 
 The model adapter, base model, and source code have separate licensing. ELLM and its SmolLM2 base are Apache-2.0; see the linked model cards. This repository's source license is MIT. Review model/data terms before redistributing trained weights.
 
