@@ -81,15 +81,15 @@ Commands run with no shell, a fixed working folder, captured output, a timeout, 
 
 ## Fine-tune ELLM for task following
 
-The training pipeline continues the existing LoRA adapter; it does not train a foundation model from scratch or modify your Hugging Face repository. The built-in dataset contains English and Arabic examples for file actions, summaries, safe command aliases, ambiguous requests, and refusal/clarification cases. You can inspect and edit `training/data/build_dataset.py` before generating the splits.
+The training pipeline continues the existing LoRA adapter; it does not train a foundation model from scratch or modify your Hugging Face repository. The v2 curriculum contains synthetic English and Arabic examples for file actions, summaries, safe command aliases, ambiguous requests, and clarification cases. Its builder reads only the existing training and development splits, and writes new splits to `training/data/v2/`; it does not read or include a held-out split. The trainer widens the adapter from LoRA rank 8 to rank 16 while preserving its initial outputs, then saves the epoch with the lowest development loss.
 
 ```powershell
-./.venv/Scripts/python.exe training/data/build_dataset.py
-./.venv/Scripts/python.exe training/train_agent_adapter.py --epochs 2
-./.venv/Scripts/python.exe training/evaluate_agent_adapter.py --adapter-dir models/candidates/latest
+./.venv/Scripts/python.exe training/data/build_training_v2.py
+./.venv/Scripts/python.exe training/train_agent_adapter.py --epochs 3 --lora-rank 16 --lora-alpha 32 --learning-rate 3e-5
+./.venv/Scripts/python.exe training/evaluate_agent_adapter.py --adapter-dir models/candidates/latest --data path/to/frozen-evaluation.jsonl
 ```
 
-Training requires a compatible CUDA PyTorch install and downloads the adapter/base from Hugging Face if they are not cached. Each run creates a separate candidate under `models/candidates/`; it refuses to overwrite one and saves the epoch with the lowest development loss. The evaluation report measures structured-action accuracy, valid JSON rate, exact tool-plan accuracy (including paths, aliases, and requested file text), and unsafe choices on fixed held-out examples. The held-out set has 88 templated synthetic examples, so one answer changes the aggregate by about 1.1 percentage points. A synthetic score is not evidence that the model is safe or reliable in general. Review the report before selecting any candidate with `-Adapter`; the candidate from this run failed its gate and should not be selected.
+Training requires a compatible CUDA PyTorch install and downloads the adapter/base from Hugging Face if they are not cached. Each run creates a separate candidate under `models/candidates/`; it refuses to overwrite one and saves the epoch with the lowest development loss. Evaluation requires an explicit frozen JSONL path and measures structured-action accuracy, valid JSON rate, exact tool-plan accuracy (including paths, aliases, and requested file text), and unsafe choices. Keep evaluation examples out of training and development data. A synthetic score is not evidence that the model is safe or reliable in general. Review the report before selecting any candidate with `-Adapter`.
 
 The model adapter, base model, and source code have separate licensing. ELLM and its SmolLM2 base are Apache-2.0; see the linked model cards. This repository's source license is MIT. Review model/data terms before redistributing trained weights.
 

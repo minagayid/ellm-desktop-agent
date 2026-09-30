@@ -16,7 +16,6 @@ from ellm_agent.model import LocalELLM, load_model_config
 from ellm_agent.prompts import parse_action
 
 
-TEST_FILE = ROOT / "training" / "data" / "test.jsonl"
 DEFAULT_REPORT = ROOT / "run-data" / "evaluations" / "latest.json"
 MIN_ACTION_ACCURACY = 0.80
 MIN_VALID_JSON_RATE = 0.95
@@ -86,7 +85,7 @@ def evaluate(adapter: str | None, rows: list[dict[str, Any]], config: dict[str, 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Compare baseline ELLM and a local candidate on frozen bilingual examples.")
     parser.add_argument("--adapter-dir", type=Path, required=True)
-    parser.add_argument("--data", type=Path, default=TEST_FILE)
+    parser.add_argument("--data", type=Path, required=True, help="Explicit frozen evaluation JSONL; never use train/dev data here.")
     parser.add_argument("--output", type=Path, default=DEFAULT_REPORT)
     args = parser.parse_args()
     if not args.adapter_dir.is_dir():
@@ -117,7 +116,7 @@ def main() -> None:
     report = {
         "schema_version": 1,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "test_data_sha256": sha256(args.data),
+        "evaluation_data_sha256": sha256(args.data),
         "baseline": baseline,
         "candidate": candidate,
         "gate": gate,

@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "source": "Synthetic curriculum expanded only from the prior train/dev splits; no legacy held-out split is read or included.",
+  "base_input_sha256": {
+    "train": "77fffef5797b7f9c075b330eb18c3875fe23adb033ea688359b63edf64fa7783",
+    "dev": "0c109d7f54a03b4f86cb18cf36a4a130dd34028c54f5bfe80dcd16842221a647"
+  },
+  "splits": {
+    "train": {
+      "rows": 1100,
+      "sha256": "8f230ce8c58b72c2c01c906ff2628414b255e54f5a80da2d19566e56ee5151a9",
+      "languages": {
+        "en": 550,
+        "ar": 550
+      },
+      "actions": {
+        "ask_user": 100,
+        "create_folder": 100,
+        "find_files": 100,
+        "list_directory": 100,
+        "move_path": 100,
+        "open_path": 100,
+        "read_file": 100,
+        "replace_file": 100,
+        "respond": 100,
+        "run_command": 100,
+        "write_file": 100
+      }
+    },
+    "dev": {
+      "rows": 264,
+      "sha256": "e106aef76bd18c469dc4334810d8c95677b216d46c44956cb849b443e05212e6",
+      "languages": {
+        "en": 132,
+        "ar": 132
+      },
+      "actions": {
+        "ask_user": 24,
+        "create_folder": 24,
+        "find_files": 24,
+        "list_directory": 24,
+        "move_path": 24,
+        "open_path": 24,
+        "read_file": 24,
+        "replace_file": 24,
+        "respond": 24,
+        "run_command": 24,
+        "write_file": 24
+      }
+    }
+  }
+}
